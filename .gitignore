@@ -1,0 +1,13 @@
+# data (regenerate with data/download.py instead of committing raw CSVs)
+data/ml-latest-small/
+data/*.zip
+
+# python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+venv/
+.venv/
+
+# os
+.DS_Store
