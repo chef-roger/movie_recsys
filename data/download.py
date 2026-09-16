@@ -5,8 +5,10 @@ We don't commit the raw CSVs to git — run this script instead after cloning.
 Usage: python data/download.py
 """
 import os
+import ssl
 import zipfile
 import urllib.request
+import certifi
 
 URL = "https://files.grouplens.org/datasets/movielens/ml-latest-small.zip"
 DEST_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -19,6 +21,13 @@ def main():
         return
 
     print(f"Downloading {URL} ...")
+    # Use certifi's certificate bundle explicitly — fixes
+    # "SSL: CERTIFICATE_VERIFY_FAILED" on some Windows Python installs.
+    ssl_context = ssl.create_default_context(cafile=certifi.where())
+    opener = urllib.request.build_opener(
+        urllib.request.HTTPSHandler(context=ssl_context)
+    )
+    urllib.request.install_opener(opener)
     urllib.request.urlretrieve(URL, ZIP_PATH)
 
     print("Unzipping...")
