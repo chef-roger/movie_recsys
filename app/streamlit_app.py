@@ -1,16 +1,46 @@
+import os
 import sys
+import zipfile
+import urllib.request
 from pathlib import Path
 
 # Add project root directory (movie_recsys) to sys.path
-sys.path.append(str(Path(__file__).resolve().parent.parent))
+BASE_DIR = Path(__file__).resolve().parent.parent
+sys.path.append(str(BASE_DIR))
 
 import numpy as np
 import pandas as pd
 import streamlit as st
 
+# Data directory configuration
+DATA_DIR = BASE_DIR / "data" / "ml-latest-small"
+MOVIES_PATH = DATA_DIR / "movies.csv"
+RATINGS_PATH = DATA_DIR / "ratings.csv"
+
+
+def ensure_data_exists():
+    """Auto-downloads and extracts MovieLens dataset if CSVs are missing."""
+    if not MOVIES_PATH.exists() or not RATINGS_PATH.exists():
+        st.info("Downloading MovieLens dataset for first-time setup...")
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        zip_path = BASE_DIR / "data" / "ml-latest-small.zip"
+
+        url = "https://files.grouplens.org/datasets/movielens/ml-latest-small.zip"
+        urllib.request.urlretrieve(url, zip_path)
+
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
+            zip_ref.extractall(BASE_DIR / "data")
+
+        if zip_path.exists():
+            os.remove(zip_path)
+
+
+# Download data if absent on Streamlit Cloud
+ensure_data_exists()
+
 from onboarding import (
     load_cf_model, get_popular_movies, fold_in_user, get_candidates, rank,
-    get_bandit_for_user, record_feedback, MOVIES_PATH, RATINGS_PATH
+    get_bandit_for_user, record_feedback
 )
 
 st.set_page_config(page_title="Movie Recommender")
@@ -43,7 +73,6 @@ def all_genres():
 
 
 def genre_filtered_movies(genres, n=50, min_ratings=20):
-    """Fetch a larger pool of top-rated movies in selected genres."""
     movies = load_movies()
     ratings = load_ratings()
     stats = ratings.groupby("movieId")["rating"].agg(["count", "mean"])
@@ -60,7 +89,7 @@ if "stage" not in st.session_state:
 if "ratings" not in st.session_state:
     st.session_state.ratings = {}
 if "dismissed" not in st.session_state:
-    st.session_state.dismissed = set()  # Tracks movies the user hasn't seen
+    st.session_state.dismissed = set()
 if "user_id" not in st.session_state:
     st.session_state.user_id = int(np.random.randint(100000, 999999))
 if "feedback_given" not in st.session_state:
@@ -76,39 +105,34 @@ if st.session_state.stage == "genres":
         st.session_state.stage = "rate_required"
         st.rerun()
 
-# Stage 2: Rate 10 Movies with "Haven't Seen" Swap Option
+# Stage 2: Rate 10 Movies with "Haven't Seen" Swap
 elif st.session_state.stage == "rate_required":
     REQUIRED_COUNT = 10
     st.subheader(f"Rate {REQUIRED_COUNT} movies to calibrate your profile")
-    
-    # Get broader candidate pool and filter out dismissed movies
+
     pool = genre_filtered_movies(st.session_state.genres, n=50)
     available_candidates = pool[~pool["movieId"].isin(st.session_state.dismissed)]
-    
-    # Pick the top 10 remaining candidates
     candidates = available_candidates.head(REQUIRED_COUNT)
-    
+
     current_ratings = {}
-    
+
     for idx, (_, row) in enumerate(candidates.iterrows(), 1):
         movie_id = row["movieId"]
         title = row["title"]
-        
-        # Display title and swap button side-by-side
+
         col_title, col_btn = st.columns([3, 1])
         col_title.markdown(f"**{idx}. {title}**")
-        
+
         if col_btn.button("Haven't seen", key=f"swap_{movie_id}"):
             st.session_state.dismissed.add(movie_id)
             st.rerun()
 
-        # Rating slider
         val = st.slider(
-            f"Rating for {title}", 
-            min_value=0.5, 
-            max_value=5.0, 
-            value=3.0, 
-            step=0.5, 
+            f"Rating for {title}",
+            min_value=0.5,
+            max_value=5.0,
+            value=3.0,
+            step=0.5,
             key=f"req_{movie_id}",
             label_visibility="collapsed"
         )
@@ -120,7 +144,7 @@ elif st.session_state.stage == "rate_required":
     st.caption(f"Showing {displayed_count} of {REQUIRED_COUNT} movies")
 
     if displayed_count < REQUIRED_COUNT:
-        st.warning("You've dismissed too many movies! Try adding more genres or clearing dismissals.")
+        st.warning("You've dismissed too many movies! Try adding more genres or starting over.")
 
     if st.button("Continue to Recommendations") and displayed_count == REQUIRED_COUNT:
         st.session_state.ratings.update(current_ratings)
@@ -167,7 +191,7 @@ elif st.session_state.stage == "recommend":
 
     picked = st.session_state.picked
     movies = load_movies().set_index("movieId")
-    
+
     st.write(f"### Top pick: {movies.loc[picked, 'title']}")
     st.caption(movies.loc[picked, "genres"])
 
@@ -180,7 +204,7 @@ elif st.session_state.stage == "recommend":
     st.divider()
     st.write("Did you like the top pick?")
     col1, col2 = st.columns(2)
-    
+
     if not st.session_state.feedback_given:
         if col1.button("👍 Yes"):
             record_feedback(st.session_state.user_id, picked, pu, 4.5)
