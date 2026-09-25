@@ -1,9 +1,3 @@
-"""
-Downloads and unzips the MovieLens Small dataset into data/ml-latest-small/.
-We don't commit the raw CSVs to git — run this script instead after cloning.
-
-Usage: python data/download.py
-"""
 import os
 import ssl
 import zipfile

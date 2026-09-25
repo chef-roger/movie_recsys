@@ -96,10 +96,14 @@ def predict_with_folded_in(model, pu, movie_id):
     try:
         inner_iid = model.trainset.to_inner_iid(movie_id)
     except ValueError:
-        return mu
+        return float(np.clip(mu, 1.0, 5.0))
+        
     qi = model.qi[inner_iid]
     bi = model.bi[inner_iid]
-    return mu + bi + pu @ qi
+    raw_pred = mu + bi + pu @ qi
+    
+    # Clip prediction strictly to valid rating bounds [1.0, 5.0]
+    return float(np.clip(raw_pred, 1.0, 5.0))
 
 
 def get_candidates(model, pu, rated_movie_ids, top_rated_movie_id, k=30):
@@ -123,28 +127,68 @@ def get_candidates(model, pu, rated_movie_ids, top_rated_movie_id, k=30):
     return combined, similarity_lookup
 
 
+def get_candidates_from_picks(model, pu, picked_ids, k=30):
+
+    picked_ids = set(picked_ids)
+    all_movie_ids = [model.trainset.to_raw_iid(iid) for iid in model.trainset.all_items()]
+    unrated = [m for m in all_movie_ids if m not in picked_ids]
+
+    cf_scores = [(m, predict_with_folded_in(model, pu, m)) for m in unrated]
+    cf_scores.sort(key=lambda x: x[1], reverse=True)
+    cf_ids = [m for m, _ in cf_scores[:k // 2]]
+
+    similarity_lookup = {}
+    per_pick_k = max(1, (k // 2) // max(1, len(picked_ids)))
+    for movie_id in picked_ids:
+        for sim_id, sim in get_similar_movies(movie_id, k=per_pick_k):
+            if sim_id in picked_ids:
+                continue
+            if sim_id not in similarity_lookup or sim > similarity_lookup[sim_id]:
+                similarity_lookup[sim_id] = sim
+
+    content_ids = list(similarity_lookup.keys())
+
+    combined = []
+    seen = set()
+    for m in cf_ids + content_ids:
+        if m not in seen:
+            seen.add(m)
+            combined.append(m)
+    return combined, similarity_lookup
+
+
 def rank(model, pu, candidates, similarity_lookup):
     scored = []
     for movie_id in candidates:
         cf_score = predict_with_folded_in(model, pu, movie_id)
         if movie_id in similarity_lookup:
-            content_score = similarity_lookup[movie_id] * 4 + 1
+            # Map cosine similarity [0.0, 1.0] to rating scale [1.0, 5.0]
+            content_score = float(np.clip(similarity_lookup[movie_id] * 4.0 + 1.0, 1.0, 5.0))
             score = 0.7 * cf_score + 0.3 * content_score
         else:
             score = cf_score
-        scored.append((movie_id, score))
+            
+        # Ensure final weighted hybrid score never exceeds 5.0
+        final_score = float(np.clip(score, 1.0, 5.0))
+        scored.append((movie_id, final_score))
+        
     scored.sort(key=lambda x: x[1], reverse=True)
     return [m for m, _ in scored]
 
 
+def recommend_from_picks(model, picked_movie_ids, k_candidates=30, top_n=10):
+
+    rated_movies = [(m, 5.0) for m in picked_movie_ids]
+    pu = fold_in_user(model, rated_movies)
+    candidates, similarity_lookup = get_candidates_from_picks(
+        model, pu, picked_movie_ids, k=k_candidates
+    )
+    ranked = rank(model, pu, candidates, similarity_lookup)
+    return ranked[:top_n]
+
+
 def onboard_and_recommend(user_id, rated_movies):
-    """
-    rated_movies: list of (movieId, rating) the new user has given so far.
-    Returns either a popularity list (not enough ratings yet) or a single
-    bandit-picked recommendation (enough context to personalize). The
-    bandit picking is persisted per user_id, so it actually learns across
-    repeated calls once record_feedback() is called after each pick.
-    """
+
     if len(rated_movies) < ONBOARDING_THRESHOLD:
         return {"mode": "popularity", "movies": get_popular_movies(n=10)}
 

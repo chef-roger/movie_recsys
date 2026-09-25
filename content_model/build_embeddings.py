@@ -1,100 +1,69 @@
 import json
+import faiss
 import numpy as np
 import pandas as pd
-import faiss
 from sentence_transformers import SentenceTransformer
 
+EMBEDDINGS_PATH = "data/content_embeddings.npy"
+INDEX_PATH = "data/faiss.index"
+MOVIE_IDS_PATH = "data/movie_ids.json"
 MOVIES_PATH = "data/ml-latest-small/movies.csv"
-TAGS_PATH = "data/ml-latest-small/tags.csv"
-EMB_OUT = "data/content_embeddings.npy"
-INDEX_OUT = "data/faiss.index"
-IDS_OUT = "data/movie_ids.json"
 
-MODEL_NAME = "all-MiniLM-L6-v2"
-
-
-def load_movies():
-    return pd.read_csv(MOVIES_PATH)
+# Global lazy-loaded cache
+_INDEX = None
+_MOVIE_IDS = None
+_ID_TO_INDEX = None
 
 
-def _build_text_per_movie():
+def load_content_resources():
+    global _INDEX, _MOVIE_IDS, _ID_TO_INDEX
+    if _INDEX is None:
+        _INDEX = faiss.read_index(INDEX_PATH)
+        with open(MOVIE_IDS_PATH, "r") as f:
+            _MOVIE_IDS = json.load(f)
+        _ID_TO_INDEX = {movie_id: idx for idx, movie_id in enumerate(_MOVIE_IDS)}
+    return _INDEX, _MOVIE_IDS, _ID_TO_INDEX
 
-    movies = load_movies()
-    tags = pd.read_csv(TAGS_PATH)
 
-    # Collapse all tags for a movie into one space-separated string,
-    # e.g. movieId 1 -> "pixar funny animated"
-    tags_per_movie = (
-        tags.groupby("movieId")["tag"]
-        .apply(lambda t: " ".join(t.astype(str)))
-        .rename("tags")
-    )
+def get_similar_movies(movie_id, k=15):
+    index, movie_ids, id_to_index = load_content_resources()
+    
+    if movie_id not in id_to_index:
+        return []
+    
+    idx = id_to_index[movie_id]
+    query_vector = index.reconstruct(idx).reshape(1, -1)
+    
+    # Query FAISS index (fetch k+1 to exclude the query movie itself)
+    similarities, indices = index.search(query_vector, k + 1)
+    
+    results = []
+    for sim, i in zip(similarities[0], indices[0]):
+        cand_id = movie_ids[i]
+        if cand_id != movie_id:
+            results.append((cand_id, float(sim)))
+            if len(results) == k:
+                break
+                
+    return results
 
-    movies = movies.merge(tags_per_movie, on="movieId", how="left")
-    movies["tags"] = movies["tags"].fillna("")
+
+def build_embeddings():
+    movies = pd.read_csv(MOVIES_PATH)
     movies["genres_clean"] = movies["genres"].str.replace("|", " ", regex=False)
-
-    movies["text"] = (
-        movies["title"] + " " + movies["genres_clean"] + " " + movies["tags"]
-    )
-    return movies[["movieId", "text"]]
-
-
-def build():
-
-    movie_text = _build_text_per_movie()
-    print(f"Building embeddings for {len(movie_text)} movies")
-
-    model = SentenceTransformer(MODEL_NAME)
-    embeddings = model.encode(
-        movie_text["text"].tolist(),
-        batch_size=64,
-        show_progress_bar=True,
-        convert_to_numpy=True,
-    ).astype("float32")
-
-    # Normalize so inner product == cosine similarity
+    
+    model = SentenceTransformer("all-MiniLM-L6-v2")
+    embeddings = model.encode(movies["genres_clean"].tolist(), show_progress_bar=True, convert_to_numpy=True)
+    
     faiss.normalize_L2(embeddings)
-
-    dim = embeddings.shape[1]
-    index = faiss.IndexFlatIP(dim)
+    index = faiss.IndexFlatIP(embeddings.shape[1])
     index.add(embeddings)
-
-    np.save(EMB_OUT, embeddings)
-    faiss.write_index(index, INDEX_OUT)
-    with open(IDS_OUT, "w") as f:
-        json.dump(movie_text["movieId"].tolist(), f)
-
-    print(f"Saved embeddings {embeddings.shape} -> {EMB_OUT}")
-    print(f"Saved FAISS index -> {INDEX_OUT}")
-
-
-def get_similar_movies(movie_id: int, k: int = 10) -> list[tuple[int, float]]:
-
-    embeddings = np.load(EMB_OUT)
-    with open(IDS_OUT) as f:
-        movie_ids = json.load(f)
-    index = faiss.read_index(INDEX_OUT)
-
-    row = movie_ids.index(movie_id)
-    query = embeddings[row : row + 1].copy()
-    faiss.normalize_L2(query)
-
-    scores, neighbors = index.search(query, k + 1)  # +1 to drop self-match
-    results = [
-        (movie_ids[i], float(s))
-        for i, s in zip(neighbors[0], scores[0])
-        if movie_ids[i] != movie_id
-    ]
-    return results[:k]
+    
+    np.save(EMBEDDINGS_PATH, embeddings)
+    faiss.write_index(index, INDEX_PATH)
+    with open(MOVIE_IDS_PATH, "w") as f:
+        json.dump(movies["movieId"].tolist(), f)
 
 
 if __name__ == "__main__":
-    build()
-
-    # quick sanity check after building
-    test_movie_id = 1  # Toy Story
-    movies = load_movies().set_index("movieId")["title"]
-    print(f"\nMovies similar to '{movies.loc[test_movie_id]}':")
-    for movie_id, score in get_similar_movies(test_movie_id, k=5):
-        print(f"  {movies.loc[movie_id]}  (score={score:.3f})")
+    build_embeddings()
