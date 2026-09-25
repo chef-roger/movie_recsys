@@ -1,9 +1,3 @@
-"""
-Person A owns this file (Phase 2/6).
-
-RMSE/MAE via surprise cross-validation, plus Precision@K/Recall@K/NDCG@K
-on the ranked output.
-"""
 import numpy as np
 import pandas as pd
 from collections import defaultdict
@@ -14,8 +8,7 @@ RATINGS_PATH = "data/ml-latest-small/ratings.csv"
 
 
 def evaluate_cf_accuracy():
-    """RMSE/MAE cross-validation - same settings as the trained model in
-    train_cf.py, so this number is directly comparable to it."""
+
     df = pd.read_csv(RATINGS_PATH)
     reader = Reader(rating_scale=(0.5, 5.0))
     data = Dataset.load_from_df(df[["userId", "movieId", "rating"]], reader)
@@ -28,15 +21,7 @@ def evaluate_cf_accuracy():
 
 
 def precision_recall_at_k(predictions, k=10, threshold=3.5):
-    """
-    Standard precision/recall@k: for each user, take their top-k predicted
-    items, check how many are actually "relevant" (real rating >= threshold).
 
-    precision@k = (relevant items in top-k) / k
-    recall@k    = (relevant items in top-k) / (total relevant items for user)
-
-    Returns (mean_precision, mean_recall) averaged across all users.
-    """
     user_predictions = defaultdict(list)
     for uid, iid, true_r, est, _ in predictions:
         user_predictions[uid].append((est, true_r))
@@ -58,11 +43,7 @@ def precision_recall_at_k(predictions, k=10, threshold=3.5):
 
 
 def ndcg_at_k(predictions, k=10):
-    """
-    NDCG@k: rewards putting truly-high-rated items near the TOP of the
-    list, not just anywhere in the top-k (unlike precision/recall, which
-    don't care about order within the top-k).
-    """
+
     user_predictions = defaultdict(list)
     for uid, iid, true_r, est, _ in predictions:
         user_predictions[uid].append((est, true_r))
@@ -83,7 +64,7 @@ def ndcg_at_k(predictions, k=10):
 
 
 def evaluate_ranking_quality(k=10, threshold=3.5):
-    """Trains on 80%, tests on the held-out 20%, reports Precision/Recall/NDCG@k."""
+
     df = pd.read_csv(RATINGS_PATH)
     reader = Reader(rating_scale=(0.5, 5.0))
     data = Dataset.load_from_df(df[["userId", "movieId", "rating"]], reader)

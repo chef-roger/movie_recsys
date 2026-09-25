@@ -1,9 +1,4 @@
-"""
-Person A owns this file (Phase 4).
 
-Blends CF score + content similarity into a single ranked list.
-Starts simple (weighted sum), can graduate to LightGBM later.
-"""
 from cf_model.train_cf import predict_rating
 from content_model.build_embeddings import get_similar_movies
 from retrieval.retrieve import get_candidates
@@ -11,14 +6,7 @@ from cf_model.train_cf import load_ratings
 
 
 def rank(user_id: int, candidate_movie_ids: list[int]) -> list[int]:
-    """
-    Score every candidate on one common scale, then sort descending.
 
-    CF candidates already have a predicted rating (1-5 scale) - use it
-    directly. Content-only candidates only have a similarity score
-    (0-1 scale) - stretch it onto the same 1-5 scale so the two are
-    comparable: similarity 0 -> ~1, similarity 1 -> 5.
-    """
     ratings = load_ratings()
     already_rated = set(ratings[ratings["userId"] == user_id]["movieId"])
 

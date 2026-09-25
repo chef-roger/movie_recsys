@@ -1,18 +1,9 @@
-"""
-JOINT FILE — built together once cf_model and content_model both work.
-
-Combines top_cf_candidates() (Person A) and get_similar_movies() (Person B)
-into a single deduplicated candidate shortlist.
-"""
 from cf_model.train_cf import top_cf_candidates, load_ratings
 from content_model.build_embeddings import get_similar_movies
 
 
 def get_candidates(user_id: int, k: int = 200) -> list[int]:
-    """
-    Combine CF-predicted candidates with content-similar candidates (seeded
-    from the user's highest-rated movie) into one deduplicated shortlist.
-    """
+
     cf_results = top_cf_candidates(user_id, k // 2)
     cf_ids = [movie_id for movie_id, _ in cf_results]
 
@@ -37,7 +28,7 @@ def get_candidates(user_id: int, k: int = 200) -> list[int]:
 
 
 def _debug_get_candidates_with_source(user_id: int, k: int = 200):
-    """Same as get_candidates but also returns where each came from - for sanity checks only."""
+
     cf_results = top_cf_candidates(user_id, k // 2)
     cf_ids = [m for m, _ in cf_results]
 
