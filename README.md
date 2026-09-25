@@ -1,61 +1,38 @@
-# Movie Recommender (CF + Content + Bandit)
+# 🎬 Hybrid Movie Recommender System
 
-## What's here
-- `interfaces.py` — the shared contract. Read this first, every time you're
-  unsure who owns what or how pieces connect.
-- `cf_model/`, `ranking/`, `evaluation/eval_cf.py` — **Person A**
-- `content_model/`, `bandit/`, `evaluation/eval_bandit.py` — **Person B**
-- `retrieval/`, `app/` — built jointly, at the checkpoints noted in the code
-- `data/download.py` — run this after cloning, don't commit the raw CSVs
+A content-based, collaborative filtering, and contextual bandit (LinUCB) hybrid movie recommendation engine built with Streamlit, Scikit-Surprise, and FAISS.
 
-## First-time setup (both people)
-```bash
-git clone <repo-url>
+---
+
+## 🚀 Quickstart (Local Setup)
+
+### 1. Clone the Repository
+git clone https://github.com/chef-roger/movie_recsys.git
 cd movie_recsys
-python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+
+### 2. Set Up Virtual Environment & Dependencies
+# Create virtual environment
+python -m venv .venv
+
+# Activate virtual environment
+# On Windows:
+.venv\Scripts\activate
+# On macOS/Linux:
+source .venv/bin/activate
+
+# Install required packages
 pip install -r requirements.txt
-python data/download.py
-```
 
-## Git workflow, step by step
+### 3. Run the Streamlit App
+streamlit run app/streamlit_app.py
 
-**One person only — create the repo:**
-1. Go to github.com → New repository → name it `movie_recsys` → don't
-   initialize with a README (we already have one) → Create.
-2. On your machine, in this folder:
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial scaffold: folder structure + interface contract"
-   git branch -M main
-   git remote add origin <the-url-github-gave-you>
-   git push -u origin main
-   ```
-3. On GitHub: Settings → Collaborators → add your partner's GitHub username.
+The app will launch automatically in your web browser at http://localhost:8501.
 
-**Both people, for every piece of work after that:**
-```bash
-git checkout main
-git pull                          # get latest before starting new work
-git checkout -b feature/cf-model  # or feature/content-model, etc.
+---
 
-# ... do your work, e.g. filling in cf_model/train_cf.py ...
+## 🛠️ How It Works
 
-git add .
-git commit -m "Implement CF training and predict_rating"
-git push -u origin feature/cf-model
-```
-Then on GitHub: open a Pull Request from your branch into `main`, the other
-person reviews/merges it. This is what stops you from silently overwriting
-each other's work.
-
-**Rule of thumb:** never commit directly to `main`. Always branch, push,
-open a PR, merge. Takes an extra minute, saves you a merge-conflict
-afternoon.
-
-## Build order
-See the docstrings in each file — every stub has a numbered TODO explaining
-exactly what to implement and in what order. Work through them in this
-sequence: `cf_model` / `content_model` (parallel) → `evaluation/eval_cf.py`
-→ `retrieval` (joint) → `ranking` → `bandit` → `evaluation/eval_bandit.py`
-→ `app/streamlit_app.py` (joint).
+1. User Pick & Rating Stage: Users select at least 3 movies and assign ratings (1.0–5.0).
+2. User Fold-In: Estimates user latent factor vectors (pu) dynamically using ridge regression without retraining the underlying SVD model.
+3. Candidate Search & Hybrid Ranking: Merges sentence-transformer cosine vector similarities (via FAISS) with Collaborative Filtering rating predictions.
+4. LinUCB Hero Selection: Dynamically surfaces a #1 recommendation using Upper Confidence Bound contextual exploitation/exploration with live feedback recording.
