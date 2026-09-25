@@ -1,12 +1,3 @@
-"""
-Person A owns this file.
-
-Trains an SVD collaborative filtering model on ratings.csv using the
-`surprise` library, and implements predict_rating() / top_cf_candidates()
-from interfaces.py.
-
-Usage: python cf_model/train_cf.py
-"""
 import pickle
 import pandas as pd
 from surprise import SVD, Dataset, Reader
@@ -21,10 +12,7 @@ def load_ratings():
 
 
 def train():
-    """
-    Loads ratings, cross-validates an SVD model (prints RMSE/MAE), then
-    retrains on the full dataset and pickles the final model to MODEL_OUT.
-    """
+
     df = load_ratings()
 
     # surprise needs exactly these three columns, in this order, and a
@@ -62,10 +50,7 @@ def predict_rating(user_id: int, movie_id: int) -> float:
 
 
 def top_cf_candidates(user_id: int, k: int = 200) -> list[tuple[int, float]]:
-    """
-    Return the top-k movies (movie_id, predicted_rating) this user hasn't
-    rated yet, sorted descending by predicted rating.
-    """
+
     model = _load_model()
     df = load_ratings()
 
@@ -80,7 +65,6 @@ def top_cf_candidates(user_id: int, k: int = 200) -> list[tuple[int, float]]:
 
 if __name__ == "__main__":
     train()
-
     # quick sanity check after training
     test_user = 1
     print(f"\nTop 5 candidates for user {test_user}:")

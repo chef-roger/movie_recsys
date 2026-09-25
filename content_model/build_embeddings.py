@@ -1,11 +1,3 @@
-"""
-Person B owns this file.
-
-Builds content embeddings from movies.csv (genres/tags) and a FAISS index,
-implementing get_similar_movies() from interfaces.py.
-
-Usage: python content_model/build_embeddings.py
-"""
 import json
 import numpy as np
 import pandas as pd
@@ -26,11 +18,7 @@ def load_movies():
 
 
 def _build_text_per_movie():
-    """
-    Combines title + genres + all tags a movie has received into one text
-    string per movie. Genres come pipe-separated ("Comedy|Drama") so we
-    replace the pipes with spaces to make them normal words for the model.
-    """
+
     movies = load_movies()
     tags = pd.read_csv(TAGS_PATH)
 
@@ -53,9 +41,7 @@ def _build_text_per_movie():
 
 
 def build():
-    """
-    Builds sentence embeddings for every movie and indexes them in FAISS.
-    """
+
     movie_text = _build_text_per_movie()
     print(f"Building embeddings for {len(movie_text)} movies")
 
@@ -84,9 +70,7 @@ def build():
 
 
 def get_similar_movies(movie_id: int, k: int = 10) -> list[tuple[int, float]]:
-    """
-    Return the k most similar movies to movie_id (movie_id, similarity_score).
-    """
+
     embeddings = np.load(EMB_OUT)
     with open(IDS_OUT) as f:
         movie_ids = json.load(f)
