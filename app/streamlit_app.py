@@ -1,11 +1,12 @@
 import sys
 import os
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+# 1. Dynamically locate the project root directory (one level up from app/)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-
+# 2. Add project root to sys.path & set active working directory
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 os.chdir(PROJECT_ROOT)
 
 import pandas as pd
@@ -21,8 +22,9 @@ from onboarding import (
     record_feedback
 )
 
-MOVIES_PATH = "data/ml-latest-small/movies.csv"
-RATINGS_PATH = "data/ml-latest-small/ratings.csv"
+# 3. Define dataset absolute paths using PROJECT_ROOT
+MOVIES_PATH = PROJECT_ROOT / "data" / "ml-latest-small" / "movies.csv"
+RATINGS_PATH = PROJECT_ROOT / "data" / "ml-latest-small" / "ratings.csv"
 
 st.set_page_config(
     page_title="Movie Recommender System",
