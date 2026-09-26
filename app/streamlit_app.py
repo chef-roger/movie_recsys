@@ -25,6 +25,7 @@ from onboarding import (
 # 3. Define dataset absolute paths using PROJECT_ROOT
 MOVIES_PATH = PROJECT_ROOT / "data" / "ml-latest-small" / "movies.csv"
 RATINGS_PATH = PROJECT_ROOT / "data" / "ml-latest-small" / "ratings.csv"
+from pathlib import Path 
 
 st.set_page_config(
     page_title="Movie Recommender System",
