@@ -1,5 +1,3 @@
-# data (regenerate with data/download.py instead of committing raw CSVs)
-data/*.zip
 
 # python
 __pycache__/
