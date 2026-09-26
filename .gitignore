@@ -1,8 +1,4 @@
 # data (regenerate with data/download.py instead of committing raw CSVs)
-data/ml-latest-small/links.csv
-data/ml-latest-small/movies.csv
-data/ml-latest-small/ratings.csv
-data/ml-latest-small/tags.csv
 data/*.zip
 
 # python
