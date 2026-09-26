@@ -1,5 +1,6 @@
 import sys
 import os
+from pathlib import Path
 
 # 1. Dynamically locate the project root directory (one level up from app/)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
